@@ -1,6 +1,6 @@
 # Target library
 lib := libuthread.a
-objs := queue.o thread.o sem.o
+objs := queue.o thread.o sem.o tps.o
 CC := gcc
 CFLAGS := -Wall -Werror
 
@@ -13,4 +13,4 @@ $(lib): $(objs)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(lib) sem.o
+	rm -f $(lib) sem.o tps.o
