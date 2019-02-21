@@ -24,7 +24,6 @@ struct test3 {
 
 static void *thread2(void *arg)
 {
-	printf("\nThread 2 in!\n");
 	struct test3 *t = (struct test3*)arg;
 
 	while (t->x < t->maxcount) {
@@ -32,13 +31,13 @@ static void *thread2(void *arg)
 		sem_up(t->sem1);
 		sem_down(t->sem2);
 	}
-	printf("Thread 2 out!\n");
+
 	return NULL;
 }
 
 static void *thread1(void *arg)
 {
-	printf("\nThread 1 in!\n");
+
 	struct test3 *t = (struct test3*)arg;
 
 	while (t->x < t->maxcount) {
@@ -46,7 +45,7 @@ static void *thread1(void *arg)
 		printf("thread 1, x = %zu\n", t->x++);
 		sem_up(t->sem2);
 	}
-	printf("Thread 1 out!\n");
+
 	return NULL;
 }
 
