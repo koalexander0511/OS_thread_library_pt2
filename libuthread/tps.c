@@ -22,36 +22,73 @@ struct tps{
 
 queue_t tps_list;
 
+int find_tps_addr_iterator(void *data, void* arg)
+{
+	struct tps * curr_item = (struct tps *)data;
+
+	return (curr_item->addr == arg);
+}
+
+static void segv_handler(int sig, siginfo_t *si, void *context)
+{
+    /*
+     * Get the address corresponding to the beginning of the page where the
+     * fault occurred
+     */
+    void *p_fault = (void*)((uintptr_t)si->si_addr & ~(TPS_SIZE - 1));
+
+    /*
+     * Iterate through all the TPS areas and find if p_fault matches one of them
+     */
+    struct tps * t = NULL;
+	queue_iterate(tps_list, find_tps_addr_iterator, (void *)&p_fault, (void**)&t);
+
+    if (t != NULL)
+        fprintf(stderr, "TPS protection error!\n");
+    else
+    	fprintf(stderr, "Regular segfault error!\n");
+
+    /* In any case, restore the default signal handlers */
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    /* And transmit the signal again in order to cause the program to crash */
+    raise(sig);
+}
+
 int tps_init(int segv)
 {
-	/* TODO: Phase 2 */
+	if (segv) {
+        struct sigaction sa;
+
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_SIGINFO;
+        sa.sa_sigaction = segv_handler;
+        sigaction(SIGBUS, &sa, NULL);
+        sigaction(SIGSEGV, &sa, NULL);
+    }
 
 	tps_list = queue_create();
 	return 0;
 }
 
-int find_item_iterator(void *data, void* arg)
+static int find_tps_tid_iterator(void *data, void* arg)
 {
 	struct tps * curr_item = (struct tps *)data;
 	pthread_t * target = (pthread_t *)arg;
 
-	if(curr_item->tid == *target)
-		return 1;
-	else
-		return 0;
+	return (curr_item->tid == *target);
 }
 
-struct tps * find_mytps()
+static struct tps * find_tps(pthread_t tid)
 {
-	pthread_t mytid = pthread_self();
-	struct tps * mytps = NULL;
+	struct tps * t = NULL;
 
-	queue_iterate(tps_list, find_item_iterator, (void *)&mytid, (void**)&mytps);
+	queue_iterate(tps_list, find_tps_tid_iterator, (void *)&tid, (void**)&t);
 
-	return mytps;
+	return t;
 }
 
-struct tps * make_new_tps()
+static struct tps * make_new_tps()
 {
 	struct tps * new_tps = malloc(sizeof(struct tps));
 	
@@ -69,7 +106,7 @@ struct tps * make_new_tps()
 
 int tps_create(void)
 {
-	struct tps * mytps = find_mytps();
+	struct tps * mytps = find_tps(pthread_self());
 	
 	if(mytps != NULL){
 		printf("TPS for thread %lu already exists at address %p!\n",pthread_self(),(void *)mytps->addr);
@@ -87,7 +124,7 @@ int tps_create(void)
 
 int tps_destroy(void)
 {
-	struct tps * mytps = find_mytps();
+	struct tps * mytps = find_tps(pthread_self());
 
 	if(mytps == NULL)
 	{
@@ -101,27 +138,56 @@ int tps_destroy(void)
 		return -1;
 	}
 	
+	queue_delete(tps_list, mytps);
+	free(mytps);
+
 	return 0;
 }
 
 int tps_read(size_t offset, size_t length, char *buffer)
 {
-	/* TODO: Phase 2 */
+	if( (offset+length > TPS_SIZE) || (buffer == NULL) )
+		return -1;
+
+	struct tps * mytps = find_tps(pthread_self());
+	if(mytps == NULL)
+	{
+		printf("TPS for this thread does not exist!\n");
+		return -1;
+	}
+
+	mprotect(mytps->addr+offset, length, PROT_READ);
+	memcpy((void*)buffer,mytps->addr+offset,length);
+	mprotect(mytps->addr+offset, length, PROT_NONE);
+
 	return 0;
 }
 
 int tps_write(size_t offset, size_t length, char *buffer)
 {
-	/* TODO: Phase 2 */
+	if( (offset+length > TPS_SIZE) || (buffer == NULL) )
+		return -1;
+
+	struct tps * mytps = find_tps(pthread_self());
+	if(mytps == NULL)
+	{
+		printf("TPS for this thread does not exist!\n");
+		return -1;
+	}
+
+	mprotect(mytps->addr+offset, length, PROT_WRITE);
+	memcpy(mytps->addr+offset,(void*)buffer,length);
+	mprotect(mytps->addr+offset, length, PROT_NONE);
+
 	return 0;
 }
 
 int tps_clone(pthread_t tid)
 {
-	struct tps * mytps = find_mytps();
-	
+	struct tps * mytps = find_tps(pthread_self());
 	if(mytps != NULL){
-		printf("TPS for thread %lu already exists at address %p!\n",pthread_self(),(void *)mytps->addr);
+		printf("TPS for thread %lu already exists at address %p!\n",
+			pthread_self(),(void *)mytps->addr);
 		return -1;
 	}
 
@@ -129,10 +195,24 @@ int tps_clone(pthread_t tid)
 	if(new_tps == NULL)
 		return -1;
 
-//	memcpy();
+	struct tps* source_tps = find_tps(tid);
+	if(source_tps == NULL){
+		printf("TPS of source thread does not exist!\n");
+		return -1;
+	}
+
+	mprotect(source_tps->addr,TPS_SIZE,PROT_READ); //allow read permission for source tps
+	mprotect(new_tps->addr,TPS_SIZE,PROT_WRITE); //allow write permission for source tps
+	
+	memcpy(new_tps->addr,source_tps->addr,TPS_SIZE);
+	
+	//disable rw permission for source and new tps
+	mprotect(source_tps->addr,TPS_SIZE,PROT_NONE); 
+	mprotect(new_tps->addr,TPS_SIZE,PROT_NONE);  
+	
 
 	queue_enqueue(tps_list, new_tps);
-	printf("Allocated TPS for thread %lu at address %p\n",pthread_self(), (void *)new_tps->addr);
+	printf("Cloned TPS for thread %lu to address %p\n",pthread_self(), (void *)new_tps->addr);
 	return 0;
 }
 
