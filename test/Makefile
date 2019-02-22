@@ -4,7 +4,8 @@ programs := \
 	sem_buffer.x \
 	sem_prime.x \
 	tps.x \
-	t.x
+	test_tpsfault.x \
+	mytps.x
 
 # User-level thread library
 UTHREADLIB := libuthread
@@ -61,6 +62,9 @@ deps := $(patsubst %.o,%.d,$(objs))
 $(libuthread):
 	@echo "MAKE	$@"
 	$(Q)$(MAKE) V=$(V) D=$(D) -C $(UTHREADPATH)
+
+#mask mmap for test_tpsfault
+test_tpsfault.x: LDFLAGS += -Wl,--wrap=mmap
 
 # Generic rule for linking final applications
 %.x: %.o $(libuthread)
