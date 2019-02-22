@@ -83,7 +83,15 @@ of its page to a new page, with correct reference counter for each page.
 
 
 ## Testing
+The testing of phrase 1 was done with *sem_count.c*, *sem_prime.c*,
+and *sem_buffer.c*. The initial file tested synchronization, while
+the other two tested application of the semaphore.
 
+
+Most of the testing of phrase 2.1 was done using *mytps.c* which took
+inspiration from the given *tps.c* file in the test directory. Asserts
+were used to ensure that normal TPS functions like *tps_write* were
+correctly working and returning the correct values. 
 
 
 
