@@ -8,12 +8,12 @@ available.
 
 
 Initializing a semaphore with function *sem_create* result in
-allocation memory for the semaphore structure, creating queue
+allocating memory for the semaphore structure, creating a queue
 using *queue_create()* within the queue API, and setting
 the integer value for the count.
 
 
-Deallocate a semaphore with *sem_destroy* result in using
+Deallocating a semaphore with *sem_destroy* results in using
 *queue_destroy* from the queue API on the semaphore struct's
 queue, and then freeing the memory allocated for the
 semaphore struct.
@@ -78,7 +78,7 @@ TPS is read into the buffer.
 
 The function *tps_write* uses the helper function *find_tps* to return
 the TPS with the correct thread ID. Then, assuming its page's *ref_count*
-iss greater than 1, *mprotect* and *memcpy* is used to copy the content
+is greater than 1, *mprotect* and *memcpy* is used to copy the content
 of its page to a new page, with correct reference counter for each page.
 
 
