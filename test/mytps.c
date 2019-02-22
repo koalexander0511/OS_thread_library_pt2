@@ -11,8 +11,8 @@
 
 #define MSG_SIZE 32
 
-static char msg1[MSG_SIZE] = "Hello World!";
-static char msg2[MSG_SIZE] = "It's a beutiful day!";
+static char msg1[MSG_SIZE] = "I think, therfore I am.";
+static char msg2[MSG_SIZE] = "And yet it moves.";
 
 void * clone_test(void *args)
 {
@@ -31,6 +31,9 @@ void * clone_test(void *args)
 	assert(tps_read(MSG_SIZE,MSG_SIZE,buffer) == 0);
 	assert(memcmp(buffer,msg2,MSG_SIZE) == 0);
 
+	assert(tps_write(0, MSG_SIZE, msg2) == 0); //write data to trigget CoW
+	assert(tps_read(0,MSG_SIZE,buffer) == 0); 
+	assert(memcmp(buffer,msg2,MSG_SIZE) == 0); //check if data is overwritten
 	printf("ok!\n");
 
 	tps_destroy();
@@ -95,6 +98,10 @@ int main(int argc, char **argv)
 	pthread_t tid;
 	pthread_create(&tid, NULL, clone_test, (void *)&main_tid);
 	pthread_join(tid, NULL);
+
+	//check if data still the same after cloning
+	assert(tps_read(0,MSG_SIZE,buffer) == 0);
+	assert(memcmp(buffer,msg1,MSG_SIZE) == 0);
 
 	printf("tps_destroy() unit test...");
 	assert(tps_destroy() == 0); //correct deletion

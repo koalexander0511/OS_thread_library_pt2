@@ -60,6 +60,10 @@ static void segv_handler(int sig, siginfo_t *si, void *context)
 
 int tps_init(int segv)
 {
+	//error if tps_list already exists (tps_init was alrady called)
+	if(tps_list != NULL) 
+		return -1;
+
 	//modifies segfault handler to distinguish between TPS protection error
 	//and regular segmentation fault
 	if (segv) {
@@ -74,6 +78,11 @@ int tps_init(int segv)
 
     //initialize the TPS queue
 	tps_list = queue_create();
+	
+	//error if queue initialization failed
+	if(tps_list == NULL)
+		return -1;
+
 	return 0;
 }
 
@@ -138,7 +147,7 @@ int tps_create(void)
 	struct tps* new_tps = make_new_tps();
 	new_tps->pg = make_new_page();
 
-	if(new_tps->pg == NULL) //error if unable to allocate page
+	if(new_tps->pg == NULL) //erro`r if unable to allocate page
 		return -1;
 	enter_critical_section();
 	queue_enqueue(tps_list, new_tps);
@@ -164,7 +173,10 @@ int tps_destroy(void)
 	exit_critical_section();
 
 	//free the memories of their shackles
-	free(mytps->pg);
+	if(mytps->pg->ref_count > 1)
+		mytps->pg->ref_count--;
+	else
+		free(mytps->pg);
 	free(mytps);
 
 	return 0;
